@@ -26,16 +26,16 @@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
 
-import glob
-import os
-import sys
-import platform
-import shutil
-import subprocess
-import pickle
-import json
-import re
 import gettext
+import glob
+import json
+import os
+import pickle
+import platform
+import re
+import shutil
+import sys
+
 import gpg
 import requests
 
@@ -49,7 +49,7 @@ gettext.install("torbrowser-launcher")
 #  2. The second must be an integer between [0, 15], inclusive
 #  3. The third must be an uppercased hex-encoded 160-bit fingerprint
 gnupg_import_ok_pattern = re.compile(
-    b"(\[GNUPG\:\]) (IMPORT_OK) ([0-9]|[1]?[0-5]) ([A-F0-9]{40})"
+    rb"(\[GNUPG\:\]) (IMPORT_OK) ([0-9]|[1]?[0-5]) ([A-F0-9]{40})"
 )
 
 
@@ -105,12 +105,8 @@ class Common(object):
 
         if tbb_version:
             # tarball filename
-            if self.architecture == "x86_64":
-                arch = "linux64"
-            else:
-                arch = "linux32"
-
-            tarball_filename = "tor-browser-" + arch + "-" + tbb_version + "_ALL.tar.xz"
+            arch = "linux64" if self.architecture == "x86_64" else "linux32"
+            tarball_filename = f"tor-browser-{arch}-{tbb_version}_ALL.tar.xz"
 
             # tarball
             self.paths["tarball_url"] = (
@@ -154,7 +150,8 @@ class Common(object):
                 "gnupg_homedir": tbb_local + "/gnupg_homedir",
                 "settings_file": tbb_config + "/settings.json",
                 "settings_file_pickle": tbb_config + "/settings",
-                "version_check_url": "https://aus1.torproject.org/torbrowser/update_3/release/Linux_x86_64-gcc3/x/ALL",
+                "version_check_url": "https://aus1.torproject.org/torbrowser/"
+                "update_3/release/Linux_x86_64-gcc3/x/ALL",
                 "version_check_file": tbb_cache + "/download/release.xml",
                 "tbb": {
                     "changelog": tbb_local
@@ -177,12 +174,13 @@ class Common(object):
             "wkd_tmp": tor_browser_developers_fingerprint,
         }
 
-    # Tor Browser 12.0 no longer has locales. If an old TBB folder exists with locales, rename it to just tor_browser
+    # Tor Browser 12.0 no longer has locales. If an old TBB folder exists with
+    # locales, rename it to just tor_browser
     def torbrowser12_rename_old_tbb(self):
         if not os.path.exists(self.paths["tbb"]["dir"]):
             return
         locale_glob = glob.iglob(
-            os.path.join(glob.escape(self.paths["tbb"]["dir"]), 'tor-browser_*')
+            os.path.join(glob.escape(self.paths["tbb"]["dir"]), "tor-browser_*")
         )
         for path in locale_glob:
             if not os.path.isdir(path):
@@ -196,9 +194,9 @@ class Common(object):
                     continue
                 except OSError as err:
                     print(
-                        _(
-                            "Could not remove {0} due a system error: {1}"
-                        ).format(path, err)
+                        _("Could not remove {0} due a system error: {1}").format(
+                            path, err
+                        )
                     )
                     continue
 
@@ -267,7 +265,8 @@ class Common(object):
 
         # Download the key from WKD directly
         r = requests.get(
-            "https://torproject.org/.well-known/openpgpkey/hu/kounek7zrdx745qydx6p59t9mqjpuhdf?l=torbrowser",
+            "https://torproject.org/.well-known/openpgpkey/hu/"
+            "kounek7zrdx745qydx6p59t9mqjpuhdf?l=torbrowser",
             proxies=self.proxies(),
         )
         if r.status_code != 200:
@@ -276,10 +275,11 @@ class Common(object):
             with open(self.paths["signing_keys"]["wkd_tmp"], "wb") as f:
                 f.write(r.content)
 
-            if self.import_key_and_check_status("wkd_tmp"):
-                print("Key imported successfully")
-            else:
-                print("Key failed to import")
+            print(
+                "Key imported successfully"
+                if self.import_key_and_check_status("wkd_tmp")
+                else "Key failed to import"
+            )
 
     def import_key_and_check_status(self, key):
         """Import a GnuPG key and check that the operation was successful.
@@ -320,14 +320,12 @@ class Common(object):
 
         for key in keys:
             imported = self.import_key_and_check_status(key)
-            if not imported:
-                print(
-                    _(
-                        "Could not import key with fingerprint: %s."
-                        % self.fingerprints[key]
-                    )
-                )
-                all_imports_succeeded = False
+            if imported:
+                continue
+            print(
+                _("Could not import key with fingerprint: %s." % self.fingerprints[key])
+            )
+            all_imports_succeeded = False
 
         if not all_imports_succeeded:
             print(_("Not all keys were imported successfully!"))
@@ -362,10 +360,9 @@ class Common(object):
             settings["installed"] = os.path.isfile(self.paths["tbb"]["start"])
 
             # make sure settings file is up-to-date
-            for setting in default_settings:
-                if setting not in settings:
-                    settings[setting] = default_settings[setting]
-                    resave = True
+            for setting in default_settings.keys() - settings.keys():
+                settings[setting] = default_settings[setting]
+                resave = True
 
             # make sure tor_socks_address doesn't start with 'tcp:'
             if settings["tor_socks_address"].startswith("tcp:"):
@@ -380,17 +377,19 @@ class Common(object):
             self.settings = settings
             if resave:
                 self.save_settings()
+            return
 
         # if settings file is still using old pickle format, convert to json
-        elif os.path.isfile(self.paths["settings_file_pickle"]):
+        if os.path.isfile(self.paths["settings_file_pickle"]):
             self.settings = pickle.load(open(self.paths["settings_file_pickle"]))
             self.save_settings()
             os.remove(self.paths["settings_file_pickle"])
             self.load_settings()
+            return
 
-        else:
-            self.settings = default_settings
-            self.save_settings()
+        self.settings = default_settings
+        self.save_settings()
+        return
 
     # save settings
     def save_settings(self):
