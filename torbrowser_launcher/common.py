@@ -27,7 +27,6 @@ OTHER DEALINGS IN THE SOFTWARE.
 """
 
 import gettext
-import glob
 import json
 import os
 import pickle
@@ -35,11 +34,15 @@ import platform
 import re
 import shutil
 import sys
+from pathlib import Path
 
 import gpg
 import requests
 
-SHARE = os.getenv("TBL_SHARE", sys.prefix + "/share") + "/torbrowser-launcher"
+SHARE = Path(
+    os.getenv("TBL_SHARE", Path(sys.prefix, "share")),
+    "torbrowser-launcher",
+)
 
 gettext.install("torbrowser-launcher")
 
@@ -62,38 +65,40 @@ class Common(object):
         self.default_mirror = "https://dist.torproject.org/"
         self.build_paths()
         self.torbrowser12_rename_old_tbb()
-        for d in self.paths["dirs"]:
-            self.mkdir(self.paths["dirs"][d])
+        for d in self.paths["dirs"].values():
+            mkdir_(d)
         self.load_mirrors()
         self.load_settings()
         self.build_paths()
-        self.mkdir(self.paths["download_dir"])
-        self.mkdir(self.paths["tbb"]["dir"])
+        mkdir_(self.paths["download_dir"])
+        mkdir_(self.paths["tbb"]["dir"])
         self.init_gnupg()
 
     # build all relevant paths
     def build_paths(self, tbb_version=None):
-        homedir = os.getenv("HOME")
-        if not homedir:
-            homedir = "/tmp/.torbrowser-" + os.getenv("USER")
-            if not os.path.exists(homedir):
-                try:
-                    os.mkdir(homedir, 0o700)
-                except:
-                    self.set_gui(
-                        "error", _("Error creating {0}").format(homedir), [], False
-                    )
+        try:
+            homedir = Path.home()
+        except RuntimeError:
+            homedir = Path("/tmp", ".torbrowser-" + os.getenv("USER", ""))
+            try:
+                homedir.mkdir(0o700, exist_ok=True)
+            except OSError:
+                self.set_gui(
+                    "error", _("Error creating {0}").format(homedir), [], False
+                )
 
-        tbb_config = "{0}/torbrowser".format(
-            os.getenv("XDG_CONFIG_HOME", "{0}/.config".format(homedir))
+        tbb_config = Path(
+            os.getenv("XDG_CONFIG_HOME", homedir / ".config"),
+            "torbrowser",
         )
-        tbb_cache = "{0}/torbrowser".format(
-            os.getenv("XDG_CACHE_HOME", "{0}/.cache".format(homedir))
+        tbb_cache = Path(
+            os.getenv("XDG_CACHE_HOME", homedir / ".cache"),
+            "torbrowser",
         )
-        tbb_local = "{0}/torbrowser".format(
-            os.getenv("XDG_DATA_HOME", "{0}/.local/share".format(homedir))
+        tbb_local = Path(
+            os.getenv("XDG_DATA_HOME", homedir / ".local" / "share"), "torbrowser"
         )
-        old_tbb_data = "{0}/.torbrowser".format(homedir)
+        old_tbb_data = homedir / "torbrowser"
 
         if tbb_version:
             # tarball filename
@@ -101,20 +106,16 @@ class Common(object):
             tarball_filename = f"tor-browser-{arch}-{tbb_version}_ALL.tar.xz"
 
             # tarball
-            self.paths["tarball_url"] = (
-                "{0}torbrowser/" + tbb_version + "/" + tarball_filename
-            )
-            self.paths["tarball_file"] = tbb_cache + "/download/" + tarball_filename
+            self.paths["tarball_url"] = f"torbrowser/{tbb_version}/{tarball_filename}"
+            self.paths["tarball_file"] = Path(tbb_cache, "download", tarball_filename)
             self.paths["tarball_filename"] = tarball_filename
 
             # sig
-            self.paths["sig_url"] = (
-                "{0}torbrowser/" + tbb_version + "/" + tarball_filename + ".asc"
+            self.paths["sig_url"] = f"torbrowser/{tbb_version}/{tarball_filename}.asc"
+            self.paths["sig_filename"] = f"{tarball_filename}.asc"
+            self.paths["sig_file"] = Path(
+                tbb_cache, "download", self.paths["sig_filename"]
             )
-            self.paths["sig_file"] = (
-                tbb_cache + "/download/" + tarball_filename + ".asc"
-            )
-            self.paths["sig_filename"] = tarball_filename + ".asc"
         else:
             self.paths = {
                 "dirs": {
@@ -123,39 +124,35 @@ class Common(object):
                     "local": tbb_local,
                 },
                 "old_data_dir": old_tbb_data,
-                "tbl_bin": sys.argv[0],
-                "icon_file": os.path.join(
-                    os.path.dirname(SHARE), "pixmaps/torbrowser.png"
-                ),
-                "torproject_pem": os.path.join(SHARE, "torproject.pem"),
+                "tbl_bin": Path(sys.argv[0]),
+                "icon_file": SHARE.parent / "pixmaps/torbrowser.png",
+                "torproject_pem": SHARE / "torproject.pem",
                 "signing_keys": {
-                    "tor_browser_developers": os.path.join(
-                        SHARE, "tor-browser-developers.asc"
-                    ),
-                    "wkd_tmp": os.path.join(tbb_cache, "torbrowser.gpg"),
+                    "tor_browser_developers": SHARE / "tor-browser-developers.asc",
+                    "wkd_tmp": tbb_cache / "torbrowser.gpg",
                 },
                 "mirrors_txt": [
-                    os.path.join(SHARE, "mirrors.txt"),
-                    tbb_config + "/mirrors.txt",
+                    SHARE / "mirrors.txt",
+                    tbb_config / "mirrors.txt",
                 ],
-                "download_dir": tbb_cache + "/download",
-                "gnupg_homedir": tbb_local + "/gnupg_homedir",
-                "settings_file": tbb_config + "/settings.json",
-                "settings_file_pickle": tbb_config + "/settings",
+                "download_dir": tbb_cache / "download",
+                "gnupg_homedir": tbb_local / "gnupg_homedir",
+                "settings_file": tbb_config / "settings.json",
+                "settings_file_pickle": tbb_config / "settings",
                 "version_check_url": "https://aus1.torproject.org/torbrowser/"
                 "update_3/release/Linux_x86_64-gcc3/x/ALL",
-                "version_check_file": tbb_cache + "/download/release.xml",
+                "version_check_file": tbb_cache / "download/release.xml",
                 "tbb": {
                     "changelog": tbb_local
-                    + "/tbb/"
-                    + self.architecture
-                    + "/tor-browser/Browser/TorBrowser/Docs/ChangeLog.txt",
-                    "dir": tbb_local + "/tbb/" + self.architecture,
-                    "dir_tbb": tbb_local + "/tbb/" + self.architecture + "/tor-browser",
+                    / "tbb"
+                    / self.architecture
+                    / "tor-browser/Browser/TorBrowser/Docs/ChangeLog.txt",
+                    "dir": tbb_local / "tbb" / self.architecture,
+                    "dir_tbb": tbb_local / "tbb" / self.architecture / "tor-browser",
                     "start": tbb_local
-                    + "/tbb/"
-                    + self.architecture
-                    + "/tor-browser/start-tor-browser.desktop",
+                    / "tbb"
+                    / self.architecture
+                    / "tor-browser/start-tor-browser.desktop",
                 },
             }
 
@@ -169,15 +166,12 @@ class Common(object):
     # Tor Browser 12.0 no longer has locales. If an old TBB folder exists with
     # locales, rename it to just tor_browser
     def torbrowser12_rename_old_tbb(self):
-        if not os.path.exists(self.paths["tbb"]["dir"]):
+        if not self.paths["tbb"]["dir"].exists():
             return
-        locale_glob = glob.iglob(
-            os.path.join(glob.escape(self.paths["tbb"]["dir"]), "tor-browser_*")
-        )
-        for path in locale_glob:
-            if not os.path.isdir(path):
+        for path in self.paths["tbb"]["dir"].glob("tor-browser_*"):
+            if not path.is_dir():
                 continue
-            if os.path.exists(self.paths["tbb"]["dir_tbb"]):
+            if self.paths["tbb"]["dir_tbb"].exists():
                 try:
                     # Tries to remove the locale directory if tor_browser
                     # folder already exists
@@ -193,7 +187,7 @@ class Common(object):
                     continue
 
             try:
-                os.rename(path, self.paths["tbb"]["dir_tbb"])
+                path.rename(self.paths["tbb"]["dir_tbb"])
             except OSError as err:
                 print(
                     _("Could not move {0} to {1} due an error: {2}").format(
@@ -204,35 +198,19 @@ class Common(object):
 
             print(_("Renamed {0} to {1}").format(path, self.paths["tbb"]["dir_tbb"]))
 
-    # create a directory
-    @staticmethod
-    def mkdir(path):
-        try:
-            if not os.path.exists(path):
-                os.makedirs(path, 0o700)
-                return True
-        except:
-            print(_("Cannot create directory {0}").format(path))
-            return False
-        if not os.access(path, os.W_OK):
-            print(_("{0} is not writable").format(path))
-            return False
-        return True
-
     # if gnupg_homedir isn't set up, set it up
     def init_gnupg(self):
-        if not os.path.exists(self.paths["gnupg_homedir"]):
+        if not self.paths["gnupg_homedir"].exists():
             print(_("Creating GnuPG homedir"), self.paths["gnupg_homedir"])
-            self.mkdir(self.paths["gnupg_homedir"])
+            mkdir_(self.paths["gnupg_homedir"])
         self.import_keys()
 
     def proxies(self):
         # Use tor socks5 proxy, if enabled
         if self.settings["download_over_tor"]:
-            socks5_address = "socks5h://{}".format(self.settings["tor_socks_address"])
+            socks5_address = f"socks5h://{self.settings['tor_socks_address']}"
             return {"https": socks5_address, "http": socks5_address}
-        else:
-            return None
+        return None
 
     def refresh_keyring(self):
         print("Downloading latest Tor Browser signing key...")
@@ -281,22 +259,22 @@ class Common(object):
         :returns: ``True`` if the key is now within the keyring (or was
             previously and hasn't changed). ``False`` otherwise.
         """
+        breakpoint()
         with gpg.Context() as c:
             c.set_engine_info(
-                gpg.constants.protocol.OpenPGP, home_dir=self.paths["gnupg_homedir"]
+                gpg.constants.protocol.OpenPGP,
+                home_dir=str(self.paths["gnupg_homedir"]),
             )
 
             impkey = self.paths["signing_keys"][key]
             try:
-                c.op_import(gpg.Data(file=impkey))
+                c.op_import(gpg.Data(file=str(impkey)))
             except:
                 return False
-            else:
-                result = c.op_import_result()
-                if result and self.fingerprints[key] in result.imports[0].fpr:
-                    return True
-                else:
-                    return False
+            result = c.op_import_result()
+            if result and self.fingerprints[key] in result.imports[0].fpr:
+                return True
+            return False
 
     # import gpg keys
     def import_keys(self):
@@ -315,7 +293,7 @@ class Common(object):
             if imported:
                 continue
             print(
-                _("Could not import key with fingerprint: %s." % self.fingerprints[key])
+                _("Could not import key with fingerprint: %s.") % self.fingerprints[key]
             )
             all_imports_succeeded = False
 
@@ -328,11 +306,13 @@ class Common(object):
     def load_mirrors(self):
         self.mirrors = []
         for srcfile in self.paths["mirrors_txt"]:
-            if not os.path.exists(srcfile):
-                continue
-            for mirror in open(srcfile, "r").readlines():
-                if mirror.strip() not in self.mirrors:
-                    self.mirrors.append(mirror.strip())
+            try:
+                for mirror in open(srcfile, "r"):
+                    mirror = mirror.strip()
+                    if mirror not in self.mirrors:
+                        self.mirrors.append(mirror)
+            except FileNotFoundError:
+                pass
 
     # load settings
     def load_settings(self):
@@ -344,12 +324,15 @@ class Common(object):
             "mirror": self.default_mirror,
         }
 
-        if os.path.isfile(self.paths["settings_file"]):
+        try:
             settings = json.load(open(self.paths["settings_file"]))
+        except (FileNotFoundError, IsADirectoryError):
+            pass
+        else:
             resave = False
 
             # detect installed
-            settings["installed"] = os.path.isfile(self.paths["tbb"]["start"])
+            settings["installed"] = self.paths["tbb"]["start"].is_file()
 
             # make sure settings file is up-to-date
             for setting in default_settings.keys() - settings.keys():
@@ -372,10 +355,13 @@ class Common(object):
             return
 
         # if settings file is still using old pickle format, convert to json
-        if os.path.isfile(self.paths["settings_file_pickle"]):
+        try:
             self.settings = pickle.load(open(self.paths["settings_file_pickle"]))
+        except (FileNotFoundError, IsADirectoryError):
+            pass
+        else:
             self.save_settings()
-            os.remove(self.paths["settings_file_pickle"])
+            self.paths["settings_file_pickle"].unlink()
             self.load_settings()
             return
 
@@ -387,3 +373,16 @@ class Common(object):
     def save_settings(self):
         json.dump(self.settings, open(self.paths["settings_file"], "w"))
         return True
+
+
+def mkdir_(path):
+    """Creates a directory."""
+    try:
+        path.mkdir(mode=0o700, parents=True, exist_ok=True)
+    except:
+        print(_("Cannot create directory {0}").format(path))
+        return False
+    if not os.access(path, os.W_OK):
+        print(_("{0} is not writable").format(path))
+        return False
+    return True

@@ -119,7 +119,7 @@ class Launcher(QtWidgets.QMainWindow):
 
         # Set up the window
         self.setWindowTitle(_("Tor Browser"))
-        self.setWindowIcon(QtGui.QIcon(self.common.paths["icon_file"]))
+        self.setWindowIcon(QtGui.QIcon(str(self.common.paths["icon_file"])))
 
         # Label
         self.label = QtWidgets.QLabel()
@@ -264,7 +264,7 @@ class Launcher(QtWidgets.QMainWindow):
         elif task == "download_sig":
             print(
                 _("Downloading"),
-                self.common.paths["sig_url"].format(self.common.settings["mirror"]),
+                self.common.settings["mirror"] + self.common.paths["sig_url"]
             )
             self.download(
                 "signature", self.common.paths["sig_url"], self.common.paths["sig_file"]
@@ -273,7 +273,7 @@ class Launcher(QtWidgets.QMainWindow):
         elif task == "download_tarball":
             print(
                 _("Downloading"),
-                self.common.paths["tarball_url"].format(self.common.settings["mirror"]),
+                self.common.settings["mirror"] + self.common.paths["tarball_url"],
             )
             if not self.force_redownload and os.path.exists(
                 self.common.paths["tarball_file"]
@@ -304,7 +304,7 @@ class Launcher(QtWidgets.QMainWindow):
 
     def download(self, name, url, path):
         # Download from the selected mirror
-        mirror_url = url.format(self.common.settings["mirror"]).encode()
+        mirror_url = (self.common.settings["mirror"] + url).encode()
 
         # Initialize the progress bar
         self.progress_bar.setValue(0)
@@ -629,7 +629,7 @@ class VerifyThread(QtCore.QThread):
                     home_dir=self.common.paths["gnupg_homedir"],
                 )
 
-                sig = gpg.Data(file=self.common.paths["sig_file"])
+                sig = gpg.Data(file=str(self.common.paths["sig_file"]))
                 signed = gpg.Data(file=self.common.paths["tarball_file"])
 
                 try:
@@ -666,7 +666,7 @@ class ExtractThread(QtCore.QThread):
     def run(self):
         extracted = False
         try:
-            if self.common.paths["tarball_file"][-2:] == "xz":
+            if self.common.paths["tarball_file"].endswith(".xz"):
                 # if tarball is .tar.xz
                 xz = lzma.LZMAFile(self.common.paths["tarball_file"])
                 tf = tarfile.open(fileobj=xz)
