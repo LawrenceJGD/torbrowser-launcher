@@ -241,15 +241,16 @@ class Common(object):
         )
         if r.status_code != 200:
             print(f"Error fetching key, status code = {r.status_code}")
-        else:
-            with open(self.paths["signing_keys"]["wkd_tmp"], "wb") as f:
-                f.write(r.content)
+            return
 
-            print(
-                "Key imported successfully"
-                if self.import_key_and_check_status("wkd_tmp")
-                else "Key failed to import"
-            )
+        with open(self.paths["signing_keys"]["wkd_tmp"], "wb") as f:
+            f.write(r.content)
+        print(
+            "Key imported successfully"
+            if self.import_key_and_check_status("wkd_tmp")
+            else "Key failed to import"
+        )
+        return
 
     def import_key_and_check_status(self, key):
         """Import a GnuPG key and check that the operation was successful.
@@ -259,7 +260,6 @@ class Common(object):
         :returns: ``True`` if the key is now within the keyring (or was
             previously and hasn't changed). ``False`` otherwise.
         """
-        breakpoint()
         with gpg.Context() as c:
             c.set_engine_info(
                 gpg.constants.protocol.OpenPGP,
@@ -307,10 +307,11 @@ class Common(object):
         self.mirrors = []
         for srcfile in self.paths["mirrors_txt"]:
             try:
-                for mirror in open(srcfile, "r"):
-                    mirror = mirror.strip()
-                    if mirror not in self.mirrors:
-                        self.mirrors.append(mirror)
+                with open(srcfile, "r", encoding="utf-8") as f:
+                    for mirror in f:
+                        mirror = mirror.strip()
+                        if mirror not in self.mirrors:
+                            self.mirrors.append(mirror)
             except FileNotFoundError:
                 pass
 
@@ -325,7 +326,8 @@ class Common(object):
         }
 
         try:
-            settings = json.load(open(self.paths["settings_file"]))
+            with open(self.paths["settings_file"], encoding="utf-8") as f:
+                settings = json.load(f)
         except (FileNotFoundError, IsADirectoryError):
             pass
         else:
@@ -356,7 +358,8 @@ class Common(object):
 
         # if settings file is still using old pickle format, convert to json
         try:
-            self.settings = pickle.load(open(self.paths["settings_file_pickle"]))
+            with open(self.paths["settings_file_pickle"], "rb") as f:
+                self.settings = pickle.load(f)
         except (FileNotFoundError, IsADirectoryError):
             pass
         else:
@@ -371,7 +374,8 @@ class Common(object):
 
     # save settings
     def save_settings(self):
-        json.dump(self.settings, open(self.paths["settings_file"], "w"))
+        with open(self.paths["settings_file"], "w", encoding="utf-8") as f:
+            json.dump(self.settings, f)
         return True
 
 

@@ -453,10 +453,11 @@ class Launcher(QtWidgets.QMainWindow):
 
     def check_min_version(self):
         installed_version = None
-        for line in open(self.common.paths["tbb"]["changelog"], "rb").readlines():
-            if line.startswith(b"Tor Browser "):
-                installed_version = line.split()[2].decode()
-                break
+        with open(self.common.paths["tbb"]["changelog"], "rb") as f:
+            for line in f:
+                if line.startswith(b"Tor Browser "):
+                    installed_version = line.split()[2].decode()
+                    break
 
         if version.parse(self.min_version) <= version.parse(installed_version):
             return True
@@ -666,18 +667,11 @@ class ExtractThread(QtCore.QThread):
     def run(self):
         extracted = False
         try:
-            if self.common.paths["tarball_file"].endswith(".xz"):
-                # if tarball is .tar.xz
-                xz = lzma.LZMAFile(self.common.paths["tarball_file"])
-                tf = tarfile.open(fileobj=xz)
+            with tarfile.open(self.common.paths["tarball_file"]) as tf:
                 tf.extractall(self.common.paths["tbb"]["dir"])
                 extracted = True
-            else:
-                # if tarball is .tar.gz
-                if tarfile.is_tarfile(self.common.paths["tarball_file"]):
-                    tf = tarfile.open(self.common.paths["tarball_file"])
-                    tf.extractall(self.common.paths["tbb"]["dir"])
-                    extracted = True
+        except tarfile.TarError:
+            pass
         except:
             pass
 
