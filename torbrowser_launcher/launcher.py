@@ -26,19 +26,17 @@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
 
-import os
-import sys
-import subprocess
-import time
-import tarfile
-import lzma
+import gpg
 import re
 import requests
-import gpg
 import shutil
+import subprocess
+import sys
+import tarfile
+import time
 import xml.etree.ElementTree as ET
-from packaging import version
 
+from packaging import version
 from PyQt5 import QtCore, QtWidgets, QtGui
 
 
@@ -252,19 +250,19 @@ class Launcher(QtWidgets.QMainWindow):
         if task == "set_version":
             version = self.get_stable_version()
             if version:
-                self.common.build_paths(self.get_stable_version())
+                self.common.build_versioned_paths(self.get_stable_version())
                 print(_("Latest version: {}").format(version))
                 self.run_task()
-            else:
-                self.set_state(
-                    "error", _("Error detecting Tor Browser version."), [], False
-                )
-                self.update()
+                return
+            self.set_state(
+                "error", _("Error detecting Tor Browser version."), [], False
+            )
+            self.update()
 
         elif task == "download_sig":
             print(
                 _("Downloading"),
-                self.common.settings["mirror"] + self.common.paths["sig_url"]
+                self.common.settings["mirror"] + self.common.paths["sig_url"],
             )
             self.download(
                 "signature", self.common.paths["sig_url"], self.common.paths["sig_file"]
@@ -275,9 +273,7 @@ class Launcher(QtWidgets.QMainWindow):
                 _("Downloading"),
                 self.common.settings["mirror"] + self.common.paths["tarball_url"],
             )
-            if not self.force_redownload and os.path.exists(
-                self.common.paths["tarball_file"]
-            ):
+            if not self.force_redownload and self.common.paths.exists():
                 self.run_task()
             else:
                 self.download(
@@ -320,7 +316,7 @@ class Launcher(QtWidgets.QMainWindow):
             percent = float(bytes_so_far) / float(total_bytes)
             amount = float(bytes_so_far)
             units = "bytes"
-            for (size, unit) in [(1024 * 1024, "MiB"), (1024, "KiB")]:
+            for size, unit in [(1024 * 1024, "MiB"), (1024, "KiB")]:
                 if amount > size:
                     units = unit
                     amount /= float(size)
@@ -493,9 +489,9 @@ class Launcher(QtWidgets.QMainWindow):
     def closeEvent(self, event):
         # Clear the download cache
         try:
-            os.remove(self.common.paths["version_check_file"])
-            os.remove(self.common.paths["sig_file"])
-            os.remove(self.common.paths["tarball_file"])
+            self.common.paths["version_check_file"].unlink()
+            self.common.paths["sig_file"].unlink()
+            self.common.paths["tarball_file"].unlink()
         except:
             pass
 

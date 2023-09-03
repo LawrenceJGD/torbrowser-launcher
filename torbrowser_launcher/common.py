@@ -56,7 +56,7 @@ gnupg_import_ok_pattern = re.compile(
 )
 
 
-class Common(object):
+class Common:
     def __init__(self, tbl_version):
         self.tbl_version = tbl_version
 
@@ -65,8 +65,8 @@ class Common(object):
         self.default_mirror = "https://dist.torproject.org/"
         self.build_paths()
         self.torbrowser12_rename_old_tbb()
-        for d in self.paths["dirs"].values():
-            mkdir_(d)
+        for folder in self.paths["dirs"].values():
+            mkdir_(folder)
         self.load_mirrors()
         self.load_settings()
         self.build_paths()
@@ -75,7 +75,7 @@ class Common(object):
         self.init_gnupg()
 
     # build all relevant paths
-    def build_paths(self, tbb_version=None):
+    def build_paths(self):
         try:
             homedir = Path.home()
         except RuntimeError:
@@ -96,65 +96,45 @@ class Common(object):
             "torbrowser",
         )
         tbb_local = Path(
-            os.getenv("XDG_DATA_HOME", homedir / ".local" / "share"), "torbrowser"
+            os.getenv("XDG_DATA_HOME", homedir / ".local/share"),
+            "torbrowser",
         )
         old_tbb_data = homedir / "torbrowser"
+        tbb_dir = tbb_local.joinpath("tbb", self.architecture)
+        torbrowser = tbb_dir / "tor-browser"
 
-        if tbb_version:
-            # tarball filename
-            arch = "linux64" if self.architecture == "x86_64" else "linux32"
-            tarball_filename = f"tor-browser-{arch}-{tbb_version}_ALL.tar.xz"
-
-            # tarball
-            self.paths["tarball_url"] = f"torbrowser/{tbb_version}/{tarball_filename}"
-            self.paths["tarball_file"] = Path(tbb_cache, "download", tarball_filename)
-            self.paths["tarball_filename"] = tarball_filename
-
-            # sig
-            self.paths["sig_url"] = f"torbrowser/{tbb_version}/{tarball_filename}.asc"
-            self.paths["sig_filename"] = f"{tarball_filename}.asc"
-            self.paths["sig_file"] = Path(
-                tbb_cache, "download", self.paths["sig_filename"]
-            )
-        else:
-            self.paths = {
-                "dirs": {
-                    "config": tbb_config,
-                    "cache": tbb_cache,
-                    "local": tbb_local,
-                },
-                "old_data_dir": old_tbb_data,
-                "tbl_bin": Path(sys.argv[0]),
-                "icon_file": SHARE.parent / "pixmaps/torbrowser.png",
-                "torproject_pem": SHARE / "torproject.pem",
-                "signing_keys": {
-                    "tor_browser_developers": SHARE / "tor-browser-developers.asc",
-                    "wkd_tmp": tbb_cache / "torbrowser.gpg",
-                },
-                "mirrors_txt": [
-                    SHARE / "mirrors.txt",
-                    tbb_config / "mirrors.txt",
-                ],
-                "download_dir": tbb_cache / "download",
-                "gnupg_homedir": tbb_local / "gnupg_homedir",
-                "settings_file": tbb_config / "settings.json",
-                "settings_file_pickle": tbb_config / "settings",
-                "version_check_url": "https://aus1.torproject.org/torbrowser/"
-                "update_3/release/Linux_x86_64-gcc3/x/ALL",
-                "version_check_file": tbb_cache / "download/release.xml",
-                "tbb": {
-                    "changelog": tbb_local
-                    / "tbb"
-                    / self.architecture
-                    / "tor-browser/Browser/TorBrowser/Docs/ChangeLog.txt",
-                    "dir": tbb_local / "tbb" / self.architecture,
-                    "dir_tbb": tbb_local / "tbb" / self.architecture / "tor-browser",
-                    "start": tbb_local
-                    / "tbb"
-                    / self.architecture
-                    / "tor-browser/start-tor-browser.desktop",
-                },
-            }
+        self.paths = {
+            "dirs": {
+                "config": tbb_config,
+                "cache": tbb_cache,
+                "local": tbb_local,
+            },
+            "old_data_dir": old_tbb_data,
+            "tbl_bin": Path(sys.argv[0]),
+            "icon_file": SHARE.parent / "pixmaps/torbrowser.png",
+            "torproject_pem": SHARE / "torproject.pem",
+            "signing_keys": {
+                "tor_browser_developers": SHARE / "tor-browser-developers.asc",
+                "wkd_tmp": tbb_cache / "torbrowser.gpg",
+            },
+            "mirrors_txt": [
+                SHARE / "mirrors.txt",
+                tbb_config / "mirrors.txt",
+            ],
+            "download_dir": tbb_cache / "download",
+            "gnupg_homedir": tbb_local / "gnupg_homedir",
+            "settings_file": tbb_config / "settings.json",
+            "settings_file_pickle": tbb_config / "settings",
+            "version_check_url": "https://aus1.torproject.org/torbrowser/"
+            "update_3/release/Linux_x86_64-gcc3/x/ALL",
+            "version_check_file": tbb_cache / "download/release.xml",
+            "tbb": {
+                "changelog": torbrowser / "Browser/TorBrowser/Docs/ChangeLog.txt",
+                "dir": tbb_dir,
+                "dir_tbb": torbrowser,
+                "start": torbrowser / "start-tor-browser.desktop",
+            },
+        }
 
         # Add the expected fingerprint for imported keys:
         tor_browser_developers_fingerprint = "EF6E286DDA85EA2A4BA7DE684E2C6E8793298290"
@@ -162,6 +142,21 @@ class Common(object):
             "tor_browser_developers": tor_browser_developers_fingerprint,
             "wkd_tmp": tor_browser_developers_fingerprint,
         }
+
+    def build_versioned_paths(self, tbb_version):
+        # tarball filename
+        arch = "linux64" if self.architecture == "x86_64" else "linux32"
+        tarball_filename = f"tor-browser-{arch}-{tbb_version}_ALL.tar.xz"
+
+        # tarball
+        self.paths["tarball_url"] = f"torbrowser/{tbb_version}/{tarball_filename}"
+        self.paths["tarball_file"] = self.paths["download_dir"] / tarball_filename
+        self.paths["tarball_filename"] = tarball_filename
+
+        # sig
+        self.paths["sig_url"] = f"torbrowser/{tbb_version}/{tarball_filename}.asc"
+        self.paths["sig_filename"] = f"{tarball_filename}.asc"
+        self.paths["sig_file"] = self.paths["download_dir"] / self.paths["sig_filename"]
 
     # Tor Browser 12.0 no longer has locales. If an old TBB folder exists with
     # locales, rename it to just tor_browser
@@ -307,8 +302,8 @@ class Common(object):
         self.mirrors = []
         for srcfile in self.paths["mirrors_txt"]:
             try:
-                with open(srcfile, "r", encoding="utf-8") as f:
-                    for mirror in f:
+                with open(srcfile, "r", encoding="utf-8") as file:
+                    for mirror in file:
                         mirror = mirror.strip()
                         if mirror not in self.mirrors:
                             self.mirrors.append(mirror)
