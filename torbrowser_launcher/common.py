@@ -255,18 +255,18 @@ class Common:
         :returns: ``True`` if the key is now within the keyring (or was
             previously and hasn't changed). ``False`` otherwise.
         """
-        with gpg.Context() as c:
-            c.set_engine_info(
+        with gpg.Context() as context:
+            context.set_engine_info(
                 gpg.constants.protocol.OpenPGP,
                 home_dir=str(self.paths["gnupg_homedir"]),
             )
 
             impkey = self.paths["signing_keys"][key]
             try:
-                c.op_import(gpg.Data(file=str(impkey)))
+                context.op_import(gpg.Data(file=str(impkey)))
             except:
                 return False
-            result = c.op_import_result()
+            result = context.op_import_result()
             if result and self.fingerprints[key] in result.imports[0].fpr:
                 return True
             return False
@@ -312,7 +312,7 @@ class Common:
 
     # load settings
     def load_settings(self):
-        default_settings = {
+        settings = {
             "tbl_version": self.tbl_version,
             "installed": False,
             "download_over_tor": False,
@@ -321,8 +321,8 @@ class Common:
         }
 
         try:
-            with open(self.paths["settings_file"], encoding="utf-8") as f:
-                settings = json.load(f)
+            with open(self.paths["settings_file"], encoding="utf-8") as file:
+                settings = json.load(file)
         except (FileNotFoundError, IsADirectoryError):
             pass
         else:
@@ -330,11 +330,6 @@ class Common:
 
             # detect installed
             settings["installed"] = self.paths["tbb"]["start"].is_file()
-
-            # make sure settings file is up-to-date
-            for setting in default_settings.keys() - settings.keys():
-                settings[setting] = default_settings[setting]
-                resave = True
 
             # make sure tor_socks_address doesn't start with 'tcp:'
             if settings["tor_socks_address"].startswith("tcp:"):
@@ -353,8 +348,8 @@ class Common:
 
         # if settings file is still using old pickle format, convert to json
         try:
-            with open(self.paths["settings_file_pickle"], "rb") as f:
-                self.settings = pickle.load(f)
+            with open(self.paths["settings_file_pickle"], "rb") as file:
+                self.settings = pickle.load(file)
         except (FileNotFoundError, IsADirectoryError):
             pass
         else:
@@ -363,14 +358,14 @@ class Common:
             self.load_settings()
             return
 
-        self.settings = default_settings
+        self.settings = settings
         self.save_settings()
         return
 
     # save settings
     def save_settings(self):
-        with open(self.paths["settings_file"], "w", encoding="utf-8") as f:
-            json.dump(self.settings, f)
+        with open(self.paths["settings_file"], "w", encoding="utf-8") as file:
+            json.dump(self.settings, file)
         return True
 
 
