@@ -395,19 +395,19 @@ class Launcher(QtWidgets.QMainWindow):
             shutil.copyfile(self.common.paths["tarball_file"], backup_tarball_filename)
             shutil.copyfile(self.common.paths["sig_file"], backup_sig_filename)
 
-            sigerror = (
+            sigerror = _(
                 "SIGNATURE VERIFICATION FAILED!\n\n"
                 "Error Code: {0}\n\n"
-                "You might be under attack, there might be a network problem, or you may be missing a "
-                "recently added Tor Browser verification key.\n\n"
-                "A copy of the Tor Browser files you downloaded have been saved here:\n"
+                "You might be under attack, there might be a network problem, "
+                "or you may be missing a recently added Tor Browser "
+                "verification key.\n\n"
+                "A copy of the Tor Browser files you downloaded have been "
+                "saved here:\n"
                 "{1}\n{2}\n\n"
-                "Click Start to refresh the keyring and try again. If the message persists report the above "
-                "error code here:\nhttps://github.com/micahflee/torbrowser-launcher/issues"
-            )
-            sigerror = sigerror.format(
-                message, backup_tarball_filename, backup_sig_filename
-            )
+                "Click Start to refresh the keyring and try again. If the "
+                "message persists report the above error code here:\n"
+                "https://github.com/micahflee/torbrowser-launcher/issues"
+            ).format(message, backup_tarball_filename, backup_sig_filename)
 
             self.set_state("task", sigerror, ["start_over"], False)
             self.update()
@@ -432,10 +432,8 @@ class Launcher(QtWidgets.QMainWindow):
             self.set_state(
                 "task",
                 _(
-                    "Tor Browser Launcher doesn't understand the file format of {0}".format(
-                        self.common.paths["tarball_file"]
-                    )
-                ),
+                    "Tor Browser Launcher doesn't understand the file format of {0}"
+                ).format(self.common.paths["tarball_file"]),
                 ["start_over"],
                 False,
             )
@@ -449,23 +447,19 @@ class Launcher(QtWidgets.QMainWindow):
 
     def check_min_version(self):
         installed_version = None
-        with open(self.common.paths["tbb"]["changelog"], "rb") as f:
-            for line in f:
+        with open(self.common.paths["tbb"]["changelog"], "rb") as file:
+            for line in file:
                 if line.startswith(b"Tor Browser "):
                     installed_version = line.split()[2].decode()
                     break
-
-        if version.parse(self.min_version) <= version.parse(installed_version):
-            return True
-
-        return False
+        return version.parse(self.min_version) <= version.parse(installed_version):
 
     def run(self):
         # Don't run if it isn't at least the minimum version
         if not self.check_min_version():
             message = _(
-                "The version of Tor Browser you have installed is earlier than it should be, which could be a "
-                "sign of an attack!"
+                "The version of Tor Browser you have installed is earlier "
+                "than it should be, which could be a sign of an attack!"
             )
             print(message)
 
@@ -591,13 +585,15 @@ class DownloadThread(QtCore.QThread):
                 # Connection error
                 if self.common.settings["download_over_tor"]:
                     message = _(
-                        "Error starting download:\n\n{0}\n\nTrying to download over Tor. "
-                        "Are you sure Tor is configured correctly and running?"
+                        "Error starting download:\n\n{0}\n\nTrying to "
+                        "download over Tor. Are you sure Tor is configured "
+                        "correctly and running?"
                     ).format(self.url.decode())
                     self.download_error.emit("error", message)
                 else:
                     message = _(
-                        "Error starting download:\n\n{0}\n\nAre you connected to the internet?"
+                        "Error starting download:\n\n{0}\n\nAre you connected "
+                        "to the internet?"
                     ).format(self.url.decode())
                     self.download_error.emit("error", message)
 

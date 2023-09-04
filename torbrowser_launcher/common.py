@@ -235,15 +235,15 @@ class Common:
             proxies=self.proxies(),
         )
         if r.status_code != 200:
-            print(f"Error fetching key, status code = {r.status_code}")
+            print(_("Error fetching key, status code = {0}").format(r.status_code))
             return
 
-        with open(self.paths["signing_keys"]["wkd_tmp"], "wb") as f:
+        with open(self.paths["signing_keys"]["wkd_tmp"], "wb") as file:
             f.write(r.content)
         print(
-            "Key imported successfully"
+            _("Key imported successfully")
             if self.import_key_and_check_status("wkd_tmp")
-            else "Key failed to import"
+            else _("Key failed to import")
         )
         return
 
